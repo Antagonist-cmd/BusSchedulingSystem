@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>User Dashboard</title>
+</head>
+<body>
+    <h1>User Dashboard</h1>
+    <p>Welcome, {{ username }}</p>
+    
+    <h2>Available Bus Schedules</h2>
+    <a href="{{ url_for('view_schedules') }}">📅 View Schedules</a>
+
+    <br><br>
+    <a href="{{ url_for('logout') }}">🚪 Logout</a>
+</body>
+<form action="{{ url_for('book_ticket') }}" method="POST">
+{% for schedule in schedules %}
+    <input type="hidden" name="schedule_id" value="{{ schedule.schedule_id }}">
+{% endfor %}
+
+</form>
+<a href="{{ url_for('my_tickets') }}">
+    <button>View My Tickets</button>
+</a>
+</html>

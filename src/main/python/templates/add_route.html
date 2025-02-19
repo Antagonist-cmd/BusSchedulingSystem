@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Add Route</h2>
+
+<form method="POST">
+    <label>Start Location:</label>
+    <input type="text" name="start_location" required>
+
+    <label>End Location:</label>
+    <input type="text" name="end_location" required>
+
+    <button type="submit">Add Route</button>
+</form>
+
+{% endblock %}

@@ -1,0 +1,23 @@
+<h2>My Tickets</h2>
+<table>
+    <tr>
+        <th>Ticket ID</th>
+        <th>Bus Name</th>
+        <th>Route</th>
+        <th>Departure</th>
+        <th>Arrival</th>
+        <th>Seat No.</th>
+        <th>Status</th>
+    </tr>
+    {% for ticket in tickets %}
+    <tr>
+        <td>{{ ticket.ticket_id }}</td>
+        <td>{{ ticket.bus_name }}</td>
+        <td>{{ ticket.start_location }} → {{ ticket.end_location }}</td>
+        <td>{{ ticket.departure_time }}</td>
+        <td>{{ ticket.arrival_time }}</td>
+        <td>{{ ticket.seat_number }}</td>
+        <td>{{ ticket.status }}</td>
+    </tr>
+    {% endfor %}
+</table>

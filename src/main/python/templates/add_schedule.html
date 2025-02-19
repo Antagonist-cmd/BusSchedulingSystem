@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Add Schedule</h2>
+
+<form method="POST">
+    <label>Bus:</label>
+    <select name="bus_id">
+        {% for bus in buses %}
+        <option value="{{ bus.bus_id }}">{{ bus.bus_name }} ({{ bus.bus_number }})</option>
+        {% endfor %}
+    </select>
+
+    <label>Route:</label>
+    <select name="route_id">
+        {% for route in routes %}
+        <option value="{{ route.route_id }}">{{ route.start_location }} → {{ route.end_location }}</option>
+        {% endfor %}
+    </select>
+
+    <label>Departure Time:</label>
+    <input type="datetime-local" name="departure_time" required>
+
+    <label>Arrival Time:</label>
+    <input type="datetime-local" name="arrival_time" required>
+
+    <button type="submit">Add Schedule</button>
+</form>
+
+{% endblock %}

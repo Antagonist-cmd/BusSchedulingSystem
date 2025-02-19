@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bus Scheduling System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Bus Scheduling System</h1>
+
+    <section id="buses">
+        <h2>All Buses</h2>
+        <ul id="bus-list"></ul>
+        <h3>Add Bus</h3>
+        <input type="text" id="bus-number" placeholder="Bus Number">
+        <input type="number" id="bus-capacity" placeholder="Capacity">
+        <button onclick="addBus()">Add Bus</button>
+    </section>
+
+    <section id="routes">
+        <h2>All Routes</h2>
+        <ul id="route-list"></ul>
+        <h3>Add Route</h3>
+        <input type="text" id="route-start" placeholder="Start Location">
+        <input type="text" id="route-end" placeholder="End Location">
+        <button onclick="addRoute()">Add Route</button>
+    </section>
+
+    <form action="/assign_bus_new" method="POST">
+        <label for="bus_id">Bus ID:</label>
+        <input type="text" name="bus_id" required>
+        
+        <label for="route_id">Route ID:</label>
+        <input type="text" name="route_id" required>
+    
+        <label for="departure_time">Departure Time:</label>
+        <input type="time" name="departure_time" required>  <!-- ✅ Add this line -->
+    
+        <button type="submit">Assign Bus</button>
+    </form>
+    
+
+    <section id="assign">
+        <h2>Assign Bus to Route</h2>
+        <select id="bus-select"></select>
+        <select id="route-select"></select>
+        <button onclick="assignBus()">Assign</button>
+    </section>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
+
+
