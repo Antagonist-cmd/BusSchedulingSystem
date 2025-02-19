@@ -212,5 +212,5 @@ def my_tickets():
 
 
 
-if __name__ == '__main__':
+
    
