@@ -1,6 +1,8 @@
+# ✅ Initialize Extensionsfrom flask import Flask, render_template, request, redirect, url_for, flash
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from sqlalchemy import select
 from flask_sqlalchemy import SQLAlchemy
 from datetime import timedelta
 
@@ -188,22 +190,40 @@ def book_ticket():
 @app.route('/my_tickets')
 @login_required
 def my_tickets():
-    tickets = db.session.query(
-        Ticket.ticket_id,
-        Ticket.seat_number,
-        Ticket.status,
-        Schedule.departure_time,
-        Schedule.arrival_time,
-        Bus.bus_name,
-        Route.start_location,
-        Route.end_location
-    ).join(Schedule, Ticket.schedule_id == Schedule.schedule_id)\
-     .join(Bus, Schedule.bus_id == Bus.bus_id)\
-     .join(Route, Schedule.route_id == Route.route_id)\
-     .filter(Ticket.user_id == current_user.id)\
-     .all()
+    tickets = db.session.execute(
+        select(
+            Ticket.ticket_id,
+            Ticket.seat_number,
+            Ticket.status,
+            Schedule.departure_time,
+            Schedule.arrival_time,
+            Bus.bus_name,
+            Route.start_location,
+            Route.end_location
+        ).join(Schedule, Ticket.schedule_id == Schedule.schedule_id)
+         .join(Bus, Schedule.bus_id == Bus.bus_id)
+         .join(Route, Schedule.route_id == Route.route_id)
+         .filter(Ticket.user_id == current_user.id)
+    ).all()
 
-    return render_template('my_tickets.html', tickets=tickets)
+    return render_template('my_tickets.html', tickets=tickets)  # Ensure 'tickets' is passed
+
+
+@app.route('/cancel_ticket', methods=['POST'])
+@login_required
+def cancel_ticket():
+    ticket_id = request.form.get('ticket_id')
+    ticket = Ticket.query.filter_by(ticket_id=ticket_id, user_id=current_user.id).first()
+
+    if ticket:
+        db.session.delete(ticket)
+        db.session.commit()
+        flash("Ticket canceled successfully!", "success")
+    else:
+        flash("Ticket not found!", "danger")
+
+    return redirect(url_for('my_tickets'))
+
 
 if __name__ == '__main__':
     app.run(debug=True)
