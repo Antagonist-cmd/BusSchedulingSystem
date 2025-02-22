@@ -8,7 +8,9 @@ from datetime import timedelta
 app = Flask(__name__)
 app.secret_key = "new_secret_key_123"
 app.permanent_session_lifetime = timedelta(days=1)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+
+# ✅ Fixed MySQL Connection URI (URL-encoded '@' symbol in password)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:sqlpass%402435@localhost/bus_scheduling_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # ✅ Initialize Extensions
@@ -24,9 +26,6 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(50), nullable=False)
-
-    def check_password(self, password):
-        return bcrypt.check_password_hash(self.password, password)
 
 class Bus(db.Model):
     __tablename__ = 'buses'
@@ -99,27 +98,23 @@ def login():
 
         if user:
             print(f"User found: {user.username}")
-            print(f"Stored hashed password: {user.password}")
-            print(f"Entered password: {password}")
+            print(f"Stored Hash from DB: {user.password}")
+            print(f"Entered Password: {password}")
 
             if bcrypt.check_password_hash(user.password, password):
-                print("Password matches!")
+                print("✅ Password matches!")
                 login_user(user)
                 flash("Login successful!", "success")
 
-                if user.role == 'admin':
+                if hasattr(user, 'role') and user.role == 'admin':
                     return redirect(url_for('admin_dashboard'))
-                else:
-                    return redirect(url_for('user_dashboard'))
+                return redirect(url_for('user_dashboard'))
             else:
-                print("Password does not match!")
-
+                print("❌ Password does not match!")
+        
         flash("Invalid username or password", "danger")
 
     return render_template('login.html')
-
-
-
 
 @app.route("/logout")
 @login_required
@@ -209,8 +204,6 @@ def my_tickets():
      .all()
 
     return render_template('my_tickets.html', tickets=tickets)
-
-
 
 if __name__ == '__main__':
     app.run(debug=True)
