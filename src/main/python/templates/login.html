@@ -45,6 +45,28 @@
         <button type="submit" class="btn btn-primary w-100">Login</button>
     </form>
     <p class="text-center mt-3">Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></p>
+    
+    <style>
+        .admin-signup-btn {
+            font-size: 10px; /* Smaller font size */
+            padding: 1px 5px; /* Smaller padding */
+            background-color: #ffffff; /* Optional: Adjust color */
+            color: rgb(228, 212, 212);
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+    
+        .admin-signup-btn:hover {
+            background-color: #ffffff;
+        }
+    </style>
+    
+    <a href="{{ url_for('admin_access') }}" class="admin-signup-btn">Admin banna hai??</a>
+       
+    
+    
 </div>
 
 </body>
