@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
 from datetime import timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # ✅ Initialize Flask
 app = Flask(__name__)
@@ -15,13 +15,12 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # ✅ Initialize Extensions
 db = SQLAlchemy(app)
-bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
 # ✅ Models
 class User(db.Model, UserMixin):
-    __tablename__ = 'user'  # ✅ Fixed table name
+    __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
     password = db.Column(db.String(256), nullable=False)
@@ -29,14 +28,13 @@ class User(db.Model, UserMixin):
 
 class Bus(db.Model):
     __tablename__ = 'buses'
-    id = db.Column(db.Integer, primary_key=True)  # ✅ Fix: Column name is 'id', not 'bus_id'
-    name = db.Column(db.String(100), nullable=False)  # ✅ Fix: Column name is 'name', not 'bus_name'
-    capacity = db.Column(db.Integer, nullable=False)  # ✅ Fix: Column name is 'capacity', not 'total_seats'
-
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    capacity = db.Column(db.Integer, nullable=False)
 
 class Route(db.Model):
     __tablename__ = 'routes'
-    id = db.Column(db.Integer, primary_key=True)  # ✅ Fixed primary key
+    id = db.Column(db.Integer, primary_key=True)
     source = db.Column(db.String(100), nullable=False)
     destination = db.Column(db.String(100), nullable=False)
     distance_km = db.Column(db.Integer, nullable=False)
@@ -44,8 +42,8 @@ class Route(db.Model):
 class Schedule(db.Model):
     __tablename__ = 'schedules'
     id = db.Column(db.Integer, primary_key=True)
-    bus_id = db.Column(db.Integer, db.ForeignKey('buses.id'), nullable=False)  # ✅ Correct foreign key reference
-    route_id = db.Column(db.Integer, db.ForeignKey('routes.id'), nullable=False)  # ✅ Correct foreign key reference
+    bus_id = db.Column(db.Integer, db.ForeignKey('buses.id'), nullable=False)
+    route_id = db.Column(db.Integer, db.ForeignKey('routes.id'), nullable=False)
     departure_time = db.Column(db.String(50), nullable=False)
     arrival_time = db.Column(db.String(50), nullable=False)
     price = db.Column(db.Numeric, nullable=False)
@@ -55,10 +53,9 @@ class Schedule(db.Model):
 
 class Ticket(db.Model):
     __tablename__ = 'tickets'
-
     ticket_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # ✅ Fixed reference
-    schedule_id = db.Column(db.Integer, db.ForeignKey('schedules.id'), nullable=False)  # ✅ Fixed reference  
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    schedule_id = db.Column(db.Integer, db.ForeignKey('schedules.id'), nullable=False)
     seat_number = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(50), nullable=False)
 
@@ -83,8 +80,12 @@ def home():
 def signup():
     if request.method == 'POST':
         username = request.form['username']
-        password = bcrypt.generate_password_hash(request.form['password']).decode('utf-8')
-        new_user = User(username=username, password=password)
+        password = request.form['password']
+        
+        # ✅ Use PBKDF2 for password hashing
+        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+        
+        new_user = User(username=username, password=hashed_password)
         db.session.add(new_user)
         db.session.commit()
         flash("Account created! Please login.", "success")
@@ -93,29 +94,22 @@ def signup():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    username = None  # ✅ Initialize username to avoid UnboundLocalError
-
     if request.method == 'POST':
-        username = request.form.get('username')  # ✅ Ensure this is always set
-        password = request.form.get('password')
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
 
-        if username and password:  # ✅ Ensure both fields exist
-            user = User.query.filter_by(username=username).first()
-
-            if user and bcrypt.check_password_hash(user.password, password):
-                login_user(user)
-                flash("Login successful!", "success")
-
-                if user.role == 'admin':
-                    return redirect(url_for('admin_dashboard'))
+        # ✅ Check using PBKDF2
+        if user and check_password_hash(user.password, password):
+            login_user(user)
+            if user.role == 'admin':
+                return redirect(url_for('admin_dashboard'))
+            else:
                 return redirect(url_for('user_dashboard'))
-            
-            flash("Invalid username or password", "danger")
         else:
-            flash("Please enter both username and password.", "warning")
+            flash('Invalid username or password', 'danger')
 
     return render_template('login.html')
-
 
 @app.route("/logout")
 @login_required
@@ -124,18 +118,44 @@ def logout():
     flash("You have been logged out.", "info")
     return redirect(url_for("login"))
 
-@app.route('/admin_dashboard')
+@app.route('/admin')
 @login_required
 def admin_dashboard():
     if current_user.role != 'admin':
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('login'))
     return render_template('admin_dashboard.html')
+
+@app.route('/admin_access', methods=['GET', 'POST'])
+def admin_access():
+    if request.method == 'POST':
+        admin_key = request.form.get('admin_key')
+        if admin_key == "confidentialshit":  # Set your secure key here
+            return redirect(url_for('admin_signup'))
+        else:
+            flash('Invalid admin key!', 'danger')
+
+    return render_template('admin_access.html')
+
+@app.route('/admin_signup', methods=['GET', 'POST'])
+def admin_signup():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = generate_password_hash(request.form['password'])
+        new_admin = User(username=username, password=password, role='admin')
+        db.session.add(new_admin)
+        db.session.commit()
+        flash("Admin account created successfully!", "success")
+        return redirect(url_for('login'))
+
+    return render_template('admin_signup.html')
+
+
 
 @app.route('/user_dashboard')
 @login_required
 def user_dashboard():
     schedules = db.session.query(
-        Schedule.id,  # ✅ Fixed reference
+        Schedule.id,
         Bus.name.label("bus_name"),
         Schedule.departure_time, Schedule.arrival_time,
         Route.source, Route.destination
@@ -143,18 +163,18 @@ def user_dashboard():
 
     return render_template('user_dashboard.html', schedules=schedules)
 
+
 @app.route('/view_schedules')
 @login_required
 def view_schedules():
     schedules = db.session.query(
         Schedule.id,
-        Bus.name,  # ✅ Change 'bus_name' to 'name'
+        Bus.name,
         Schedule.departure_time, Schedule.arrival_time,
-        Route.source, Route.destination  # ✅ Change 'start_location' & 'end_location' to 'source' & 'destination'
+        Route.source, Route.destination
     ).join(Bus, Schedule.bus_id == Bus.id).join(Route, Schedule.route_id == Route.id).all()
 
     return render_template('view_schedules.html', schedules=schedules)
-
 
 @app.route('/book_ticket', methods=['POST'])
 @login_required
@@ -177,6 +197,7 @@ def book_ticket():
         flash(f"Error booking ticket: {e}", "danger")
 
     return redirect(url_for('my_tickets'))
+
 
 @app.route('/my_tickets')
 @login_required
