@@ -14,6 +14,7 @@
             <a href="{{ url_for('add_bus') }}">Add Bus</a>
             <a href="{{ url_for('add_route') }}">Add Route</a>
             <a href="{{ url_for('add_schedule') }}">Add Schedule</a>
+            <a href="{{ url_for('manage_routes') }}">Manage Routes</a> <!-- Added Manage Routes -->
         {% else %}
             <a href="{{ url_for('user_dashboard') }}">User Dashboard</a>
             <a href="{{ url_for('view_schedules') }}">View Buses</a>
@@ -27,8 +28,12 @@
             <div class="alert alert-{{ category }}">{{ message }}</div>
         {% endfor %}
     {% endif %}
-{% endwith %}
+    {% endwith %}
 
+    <!-- 👇 This is the missing part -->
+    <div>
+        {% block content %}{% endblock %}
+    </div>
 
 </body>
 </html>
