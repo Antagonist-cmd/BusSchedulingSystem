@@ -1,1 +1,38 @@
+{% extends 'base.html' %}
 
+{% block content %}
+<h2>Route Management</h2>
+
+
+<!-- ✅ Add Route Form -->
+<form method="POST" action="{{ url_for('add_route') }}">
+    <input type="text" name="source" placeholder="Source" required>
+    <input type="text" name="destination" placeholder="Destination" required>
+    <input type="number" name="distance_km" placeholder="Distance (km)" required>
+    <button type="submit">Add Route</button>
+</form>
+
+<!-- ✅ Existing Routes -->
+<table>
+    <tr>
+        <th>ID</th>
+        <th>Source</th>
+        <th>Destination</th>
+        <th>Distance (km)</th>
+        <th>Action</th>
+    </tr>
+    {% for route in routes %}
+    <tr>
+        <td>{{ route.id }}</td>
+        <td>{{ route.source }}</td>
+        <td>{{ route.destination }}</td>
+        <td>{{ route.distance_km }}</td>
+        <td>
+            <form method="POST" action="{{ url_for('delete_route', route_id=route.id) }}">
+                <button type="submit">Delete</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}
