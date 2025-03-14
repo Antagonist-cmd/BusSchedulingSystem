@@ -4,17 +4,18 @@
 <h2>Add Schedule</h2>
 
 <form method="POST">
-    <label>Bus:</label>
-    <select name="bus_id">
-        {% for bus in buses %}
-        <option value="{{ bus.bus_id }}">{{ bus.bus_name }} ({{ bus.bus_number }})</option>
-        {% endfor %}
-    </select>
+    <label for="bus">Select Bus:</label>
+    <select name="bus_id" required>
+    {% for bus in buses %}
+    <option value="{{ bus.id }}">{{ bus.name }}</option>
+    {% endfor %}
+     </select>
+
 
     <label>Route:</label>
-    <select name="route_id">
+    <select name="route_id" required>
         {% for route in routes %}
-        <option value="{{ route.route_id }}">{{ route.start_location }} → {{ route.end_location }}</option>
+            <option value="{{ route.id }}">{{ route.source }} → {{ route.destination }}</option>
         {% endfor %}
     </select>
 
@@ -24,7 +25,9 @@
     <label>Arrival Time:</label>
     <input type="datetime-local" name="arrival_time" required>
 
+    <label>Price:</label>
+    <input type="number" name="price" step="0.01" required>
+
     <button type="submit">Add Schedule</button>
 </form>
-
 {% endblock %}
