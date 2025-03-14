@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Edit Bus</h2>
+
+<<form method="POST">
+    <label>Bus Name:</label>
+    <input type="text" name="name" value="{{ bus.name }}" required>
+
+    <label>Capacity:</label>
+    <input type="number" name="capacity" value="{{ bus.capacity }}" required>
+
+    <label>Bus Number:</label>
+    <input type="text" name="bus_number" value="{{ bus.bus_number }}" required>
+
+    <button type="submit">Save</button>
+</form>
+
+{% endblock %}
