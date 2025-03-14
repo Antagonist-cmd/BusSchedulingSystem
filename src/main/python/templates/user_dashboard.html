@@ -64,19 +64,20 @@
                 {% for schedule in schedules %}
                 <tr>
                     <td>{{ schedule.bus_name }}</td>
-                    <td>{{ schedule.bus_number }}</td>
+                    <td>{{ schedule.bus_number }}</td> <!-- Now shows bus number -->
                     <td>{{ schedule.departure_time }}</td>
                     <td>{{ schedule.arrival_time }}</td>
-                    <td>{{ schedule.start_location }} → {{ schedule.end_location }}</td>
+                    <td>{{ schedule.start_location }} → {{ schedule.end_location }}</td> <!-- Route fixed -->
                     <td>
                         <form action="{{ url_for('book_ticket') }}" method="POST">
                             <input type="hidden" name="schedule_id" value="{{ schedule.id }}">
                             <button type="submit" class="btn btn-primary btn-sm">Book Now</button>
-                        </form>
+                        </form>                        
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
+            
         </table>
     </div>
 </div>
