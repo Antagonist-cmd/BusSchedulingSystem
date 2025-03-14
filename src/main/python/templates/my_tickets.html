@@ -1,33 +1,59 @@
-<h2>My Tickets</h2>
-<table>
-    <tr>
-        <th>Ticket ID</th>
-        <th>Bus Name</th>
-        <th>Route</th>
-        <th>Departure</th>
-        <th>Arrival</th>
-        <th>Seat No.</th>
-        <th>Status</th>
-        <th>Action</th>
-    </tr>
-    {% for ticket in tickets %}
-    <tr>
-        <td>{{ ticket.ticket_id }}</td>
-        <td>{{ ticket.bus_name }}</td>
-        <td>{{ ticket.start_location }} → {{ ticket.end_location }}</td>
-        <td>{{ ticket.departure_time }} - {{ ticket.arrival_time }}</td>
-        <td>{{ ticket.seat_number }}</td>
-        <td>{{ ticket.status }}</td>
-        <td>
-            {% if ticket.status != 'Cancelled' %}
-            <form action="{{ url_for('cancel_ticket') }}" method="POST">
-                <input type="hidden" name="ticket_id" value="{{ ticket.ticket_id }}">
-                <button type="submit" class="btn btn-danger">Cancel</button>
-            </form>
-            {% else %}
-            <span class="text-muted">Cancelled</span>
-            {% endif %}
-        </td>
-    </tr>
-    {% endfor %}
+<table class="table table-striped table-bordered mt-3">
+    <thead class="table-dark">
+        <tr>
+            <th>Ticket ID</th>
+            <th>Bus Name</th>
+            <th>Route</th>
+            <th>Departure</th>
+            <th>Arrival</th>
+            <th>Seat No.</th>
+            <th>Status</th>
+            <th style="text-align: center;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ticket in tickets %}
+<table class="table table-striped table-bordered mt-3" style="width: 100%; border-collapse: collapse; border: 1px solid #dee2e6;">
+    <thead class="table-dark">
+        <tr>
+            <th style="border: 1px solid #dee2e6; padding: 8px;">Ticket ID</th>
+            <th style="border: 1px solid #dee2e6; padding: 8px;">Bus Name</th>
+            <th style="border: 1px solid #dee2e6; padding: 8px;">Route</th>
+            <th style="border: 1px solid #dee2e6; padding: 8px;">Departure</th>
+            <th style="border: 1px solid #dee2e6; padding: 8px;">Arrival</th>
+            <th style="border: 1px solid #dee2e6; padding: 8px;">Seat No.</th>
+            <th style="border: 1px solid #dee2e6; padding: 8px;">Status</th>
+            <th style="border: 1px solid #dee2e6; padding: 8px;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td style="border: 1px solid #dee2e6; padding: 8px;">{{ ticket.id }}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px;">{{ ticket.schedule.bus.name }}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px;">{{ ticket.schedule.route.source }} → {{ ticket.schedule.route.destination }}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px;">{{ ticket.schedule.departure_time }}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px;">{{ ticket.schedule.arrival_time }}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px;">{{ ticket.seat_number }}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px;">{{ ticket.status }}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px;">
+                <form action="{{ url_for('cancel_ticket', ticket_id=ticket.id) }}" method="POST" style="margin: 0;">
+                    <button type="submit" style="
+                        background-color: red;
+                        color: white;
+                        border: none;
+                        padding: 5px 10px;
+                        cursor: pointer;
+                        width: 100%; 
+                    ">
+                        Cancel
+                    </button>
+                </form>
+            </td>
+        </tr>
+    </tbody>
+</table>
+{% endfor %}
+
+
+    </tbody>
 </table>
