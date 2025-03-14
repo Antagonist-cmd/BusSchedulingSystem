@@ -5,10 +5,13 @@
 
 <form method="POST">
     <label>Start Location:</label>
-    <input type="text" name="start_location" required>
+    <input type="text" name="source" required>
 
     <label>End Location:</label>
-    <input type="text" name="end_location" required>
+    <input type="text" name="destination" required>
+
+    <label>Distance (km):</label>
+    <input type="number" name="distance_km" required>
 
     <button type="submit">Add Route</button>
 </form>
