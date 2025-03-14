@@ -1,25 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>Add Bus</title>
-</head>
-<body>
-    <h1>Add New Bus</h1>
-    
-    <form method="post">
-        <label>Bus Name:</label>
-        <input type="text" name="bus_name" required><br>
+{% extends 'base.html' %}
 
-        <label>Bus Number:</label>
-        <input type="text" name="bus_number" required><br>
+{% block content %}
+<h2>Add Bus</h2>
 
-        <label>Total Seats:</label>
-        <input type="number" name="total_seats" required><br>
+<form method="POST">
+    <label>Bus Number:</label>
+    <input type="text" name="bus_number" required>
 
-        <button type="submit">Add Bus</button>
-    </form>
+    <label>Bus Name:</label>
+    <input type="text" name="name" required>
 
-    <br>
-    <a href="{{ url_for('admin_dashboard') }}">⬅ Back to Dashboard</a>
-</body>
-</html>
+    <label>Capacity:</label>
+    <input type="number" name="capacity" required>
+
+    <button type="submit">Add Bus</button>
+</form>
+
+{% endblock %}
