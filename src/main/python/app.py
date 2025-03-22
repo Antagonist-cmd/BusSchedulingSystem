@@ -3,7 +3,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_sqlalchemy import SQLAlchemy
 from datetime import timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
-
+from sqlalchemy.orm import sessionmaker
 
 # ✅ Initialize Flask
 app = Flask(__name__)
@@ -55,6 +55,7 @@ class Schedule(db.Model):
     price = db.Column(db.Float, nullable=False)
     bus = db.relationship('Bus', backref=db.backref('schedules', lazy='joined'))
     route = db.relationship('Route', backref=db.backref('schedules', lazy='joined'))
+    total_seats = db.Column(db.Integer, nullable=False, default=40)
 
 
 class Ticket(db.Model):
@@ -130,8 +131,53 @@ def logout():
 @login_required
 def admin_dashboard():
     if current_user.role != 'admin':
-        return redirect(url_for('login'))
-    return render_template('admin_dashboard.html')
+        flash("Access denied!", "danger")
+        return redirect(url_for('home'))
+    
+    total_users = User.query.count()
+    total_buses = Bus.query.count()
+    total_routes = Route.query.count()
+    total_schedules = Schedule.query.count()
+    total_tickets = Ticket.query.count()
+    
+    # ✅ Corrected: Use "source" and "destination" instead of "start_location" and "end_location"
+    schedules = (
+        Schedule.query
+        .join(Bus)
+        .join(Route)
+        .add_columns(
+            Schedule.id, Schedule.departure_time, Schedule.arrival_time,
+            Bus.name.label("bus_name"), Bus.bus_number,
+            Route.source.label("start_location"),  # Fixed column name
+            Route.destination.label("end_location")  # Fixed column name
+        )
+        .all()
+    )
+    
+    recent_tickets = (
+        Ticket.query
+        .join(User)
+        .join(Schedule)
+        .join(Bus)
+        .join(Route)
+        .order_by(Ticket.id.desc())
+        .limit(5)
+        .all()
+    )
+    
+    return render_template(
+        'admin_dashboard.html',
+        total_users=total_users,
+        total_buses=total_buses,
+        total_routes=total_routes,
+        total_schedules=total_schedules,
+        total_tickets=total_tickets,
+        recent_tickets=recent_tickets,
+        schedules=schedules
+    )
+
+
+
 
 @app.route('/admin_access', methods=['GET', 'POST'])
 def admin_access():
@@ -321,14 +367,39 @@ def edit_route(route_id):
 def user_dashboard():
     schedules = db.session.query(
         Schedule.id,
-        Bus.name.label("bus_name"),
-        Bus.bus_number,  # Include bus number here
-        Schedule.departure_time, Schedule.arrival_time,
-        Route.source.label("start_location"),  # Use consistent names
-        Route.destination.label("end_location")
-    ).join(Bus).join(Route).all()
+        Bus.name.label("name"),  # ✅ Get bus name from Bus table
+        Bus.bus_number,
+        Schedule.departure_time,
+        Schedule.arrival_time,
+        Route.source.label("start_location"),
+        Route.destination.label("end_location"),
+        Schedule.total_seats,
+        db.func.count(Ticket.id).label("booked_seats")
+    ).join(Bus, Schedule.bus_id == Bus.id  # ✅ Ensure proper join
+    ).join(Route, Schedule.route_id == Route.id
+    ).outerjoin(Ticket, Schedule.id == Ticket.schedule_id
+    ).group_by(Schedule.id, Bus.name, Bus.bus_number, Route.source, Route.destination, Schedule.total_seats
+    ).all()
+
+    # ✅ Convert tuples to dictionaries (Flask cannot directly access tuple fields)
+    schedules = [
+        {
+            "id": row[0],
+            "name": row[1],  # ✅ Now accessible in HTML
+            "bus_number": row[2],
+            "departure_time": row[3],
+            "arrival_time": row[4],
+            "start_location": row[5],
+            "end_location": row[6],
+            "total_seats": row[7],
+            "booked_seats": row[8]
+        }
+        for row in schedules
+    ]
 
     return render_template('user_dashboard.html', schedules=schedules)
+
+
 
 
 @app.route('/view_schedules')
@@ -336,14 +407,21 @@ def user_dashboard():
 def view_schedules():
     schedules = db.session.query(
         Schedule.id,
-        Bus.name.label("bus_name"),
-        Bus.bus_number,  # Include bus number
-        Schedule.departure_time, Schedule.arrival_time,
-        Route.source.label("start_location"),  # Fix naming
-        Route.destination.label("end_location")
-    ).join(Bus, Schedule.bus_id == Bus.id).join(Route, Schedule.route_id == Route.id).all()
+        Bus.name.label("name"),
+        Bus.bus_number,
+        Schedule.departure_time,
+        Schedule.arrival_time,
+        Route.source.label("start_location"),
+        Route.destination.label("end_location"),
+        Schedule.total_seats,  # Ensure this is fetched
+        db.func.count(Ticket.id).label("booked_seats")  # Count booked tickets
+    ).join(Bus, Schedule.bus_id == Bus.id
+    ).join(Route, Schedule.route_id == Route.id
+    ).outerjoin(Ticket, Schedule.id == Ticket.schedule_id  # Left join to count tickets
+    ).group_by(Schedule.id, Bus.name, Bus.bus_number, Route.source, Route.destination).all()
 
     return render_template('view_schedules.html', schedules=schedules)
+
 
 
 
@@ -467,7 +545,7 @@ def my_tickets():
     return render_template('my_tickets.html', tickets=tickets)
     tickets = db.session.query(
         Ticket.id,
-        Bus.name.label("bus_name"),
+        Bus.name.label("name"),
         Bus.bus_number,
         Route.source.label("start_location"),
         Route.destination.label("end_location"),
@@ -493,6 +571,34 @@ def cancel_ticket(ticket_id):
     db.session.commit()
     flash("Ticket cancelled successfully!", "success")
     return redirect(url_for('my_tickets'))
+
+def generate_seats(schedule_id, bus_id):
+    """Generate seats for a schedule based on bus capacity."""
+    total_seats = db.session.execute(
+        "SELECT total_seats FROM bus WHERE id = :bus_id",
+        {"bus_id": bus_id}
+    ).fetchone()[0]
+
+    # Insert seats as available
+    for seat_number in range(1, total_seats + 1):
+        db.session.execute(
+            "INSERT INTO ticket_bookings (schedule_id, seat_number) VALUES (:schedule_id, :seat_number)",
+            {"schedule_id": schedule_id, "seat_number": seat_number}
+        )
+
+    db.session.commit()
+
+@app.route('/seat_status/<int:schedule_id>')
+@login_required
+def seat_status(schedule_id):
+    seats = db.session.query(
+        Ticket.seat_number,
+        Ticket.status
+    ).filter(Ticket.schedule_id == schedule_id).all()
+
+    return render_template('seat_status.html', seats=seats, schedule_id=schedule_id)
+
+
 
 
 if __name__ == '__main__':
