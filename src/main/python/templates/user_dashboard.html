@@ -57,31 +57,38 @@
                     <th>Departure</th>
                     <th>Arrival</th>
                     <th>Route</th>
-                    <th>Action</th>
+                    <th>Seats Available</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for schedule in schedules %}
                 <tr>
-                    <td>{{ schedule.bus_name }}</td>
-                    <td>{{ schedule.bus_number }}</td> <!-- Now shows bus number -->
+                    <td>{{ schedule.name }}</td>
+                    <td>{{ schedule.bus_number }}</td>
                     <td>{{ schedule.departure_time }}</td>
                     <td>{{ schedule.arrival_time }}</td>
-                    <td>{{ schedule.start_location }} → {{ schedule.end_location }}</td> <!-- Route fixed -->
+                    <td>{{ schedule.start_location }} → {{ schedule.end_location }}</td>
                     <td>
-                        <form action="{{ url_for('book_ticket') }}" method="POST">
+                        {% if schedule.total_seats is not none and schedule.booked_seats is not none %}
+                            {{ schedule.total_seats - schedule.booked_seats }}
+                        {% else %}
+                            <span class="text-muted">0</span>
+                        {% endif %}
+                    </td>
+                    <td class="d-flex gap-2">
+                        <a href="{{ url_for('seat_status', schedule_id=schedule.id) }}" class="btn btn-info btn-sm">Check Seats</a>
+                        <form action="{{ url_for('book_ticket') }}" method="POST" class="d-inline">
                             <input type="hidden" name="schedule_id" value="{{ schedule.id }}">
                             <button type="submit" class="btn btn-primary btn-sm">Book Now</button>
-                        </form>                        
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
-            
         </table>
     </div>
 </div>
-
 <!-- ✅ Bootstrap Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
