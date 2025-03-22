@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Seat Status for Schedule ID: {{ schedule_id }}</h2>
+
+<table border="1">
+    <tr>
+        <th>Seat Number</th>
+        <th>Status</th>
+    </tr>
+    {% for seat in seats %}
+    <tr>
+        <td>{{ seat.seat_number }}</td>
+        <td>{{ seat.status }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<a href="{{ url_for('view_schedules') }}">Back to Schedules</a>
+{% endblock %}

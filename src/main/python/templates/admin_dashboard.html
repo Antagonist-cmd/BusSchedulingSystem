@@ -39,7 +39,6 @@
   </div>
 </nav>
 
-
 <!-- ✅ Dashboard Content -->
 <div class="container">
     <h2 class="text-center my-4">Admin Dashboard</h2>
@@ -68,6 +67,22 @@
                 <h2>{{ total_tickets }}</h2>
             </div>
         </div>
+
+        <!-- ✅ Total Routes -->
+        <div class="col-md-4 mt-3">
+            <div class="card p-3 text-center">
+                <h5>Total Routes</h5>
+                <h2>{{ total_routes }}</h2>
+            </div>
+        </div>
+
+        <!-- ✅ Total Schedules -->
+        <div class="col-md-4 mt-3">
+            <div class="card p-3 text-center">
+                <h5>Total Schedules</h5>
+                <h2>{{ total_schedules }}</h2>
+            </div>
+        </div>
     </div>
 
     <!-- ✅ Bus Schedule Management -->
@@ -81,6 +96,7 @@
                     <th>Departure</th>
                     <th>Arrival</th>
                     <th>Route</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -91,25 +107,52 @@
                     <td>{{ schedule.departure_time }}</td>
                     <td>{{ schedule.arrival_time }}</td>
                     <td>{{ schedule.start_location }} → {{ schedule.end_location }}</td>
+                    <td>
+                        <a href="{{ url_for('seat_status', schedule_id=schedule.id) }}" class="btn btn-info btn-sm">View Seats</a>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    <!-- ✅ Recent Bookings Section -->
+    <div class="card p-3 mt-4">
+        <h4 class="text-center">Recent Bookings</h4>
+        <table class="table table-striped table-bordered mt-3">
+            <thead class="table-dark">
+                <tr>
+                    <th>User</th>
+                    <th>Bus</th>
+                    <th>Route</th>
+                    <th>Seat</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ticket in recent_tickets %}
+                <tr>
+                    <td>{{ ticket.user.username }}</td>
+                    <td>{{ ticket.schedule.bus.name }} ({{ ticket.schedule.bus.bus_number }})</td>
+                    <td>{{ ticket.schedule.route.source }} → {{ ticket.schedule.route.destination }}</td>
+                    <td>{{ ticket.seat_number }}</td>
+                    <td>{{ ticket.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ✅ Admin Controls -->
+    <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
+        <a href="{{ url_for('manage_buses') }}" class="btn btn-secondary">Manage Buses</a>
+        <a href="{{ url_for('manage_routes') }}" class="btn btn-secondary">Manage Routes</a>
+        <a href="{{ url_for('manage_schedules') }}" class="btn btn-secondary">Manage Schedules</a>
+    </div>
 </div>
 
 <!-- ✅ Bootstrap Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<a href="{{ url_for('manage_buses') }}">Manage Buses</a>
-
-
-<a href="{{ url_for('admin_routes') }}" class="btn">Manage Routes</a>
-<a href="{{ url_for('manage_routes') }}">Manage Routes</a>
-
-
-<a href="{{ url_for('manage_schedules') }}">Manage Schedules</a>
-
 
 </body>
 </html>
