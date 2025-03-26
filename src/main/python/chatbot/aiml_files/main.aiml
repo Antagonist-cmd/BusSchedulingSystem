@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<aiml version="1.0.1">
+  <!-- Greeting Category -->
+  <category>
+    <pattern>HELLO</pattern>
+    <template>Hello! How can I help you today?</template>
+  </category>
+  
+  <!-- Fallback Category -->
+  <category>
+    <pattern>*</pattern>
+    <template>I'm sorry, I didn't understand that.</template>
+  </category>
+</aiml>

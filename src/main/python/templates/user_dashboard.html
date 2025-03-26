@@ -77,18 +77,53 @@
                         {% endif %}
                     </td>
                     <td class="d-flex gap-2">
-                        <a href="{{ url_for('seat_status', schedule_id=schedule.id) }}" class="btn btn-info btn-sm">Check Seats</a>
-                        <form action="{{ url_for('book_ticket') }}" method="POST" class="d-inline">
-                            <input type="hidden" name="schedule_id" value="{{ schedule.id }}">
-                            <button type="submit" class="btn btn-primary btn-sm">Book Now</button>
-                        </form>
-                    </td>
+                        <!-- Check Seats Button (View Only Mode) -->
+                        <a href="{{ url_for('seat_status', schedule_id=schedule.id, mode='view') }}" class="btn btn-info btn-sm">
+                            Check Seats
+                        </a>
+                    
+                        <!-- Book Now Button (Booking Mode) -->
+                        <a href="{{ url_for('seat_status', schedule_id=schedule.id, mode='book') }}" class="btn btn-primary btn-sm">
+                            Book Now
+                        </a>
+                    </td>                    
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+<div class="container mt-4">
+    <h4>Chat with our Assistant</h4>
+    <div id="chatbox" class="border p-3 mb-2" style="height: 300px; overflow-y: auto; background: white;">
+        <p><strong>Bot:</strong> Hello! How can I assist you?</p>
+    </div>
+    <input type="text" id="userInput" class="form-control mb-2" placeholder="Type your message..." />
+    <button onclick="sendMessage()" class="btn btn-primary">Send</button>
+</div>
+
+<script>
+    function sendMessage() {
+        let userMessage = document.getElementById("userInput").value;
+        if (!userMessage.trim()) return;
+
+        let chatbox = document.getElementById("chatbox");
+        chatbox.innerHTML += `<p><strong>You:</strong> ${userMessage}</p>`;
+
+        fetch("/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: userMessage })
+        })
+        .then(response => response.json())
+        .then(data => {
+            chatbox.innerHTML += `<p><strong>Bot:</strong> ${data.response}</p>`;
+            chatbox.scrollTop = chatbox.scrollHeight;  // Auto-scroll to bottom
+        });
+
+        document.getElementById("userInput").value = ""; // Clear input
+    }
+</script>
 <!-- ✅ Bootstrap Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 

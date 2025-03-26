@@ -1,0 +1,24 @@
+<learn>main.aiml</learn>
+<learn>booking.aiml</learn>
+<learn>routes.aiml</learn>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<aiml version="1.0.1">
+  <!-- Greeting Category -->
+  <category>
+    <pattern>HELLO</pattern>
+    <template>Hello! How can I help you today?</template>
+  </category>
+  
+  <!-- Additional Greeting Variation -->
+  <category>
+    <pattern>HI</pattern>
+    <template>Hi there! What can I do for you?</template>
+  </category>
+
+  <!-- Fallback Category -->
+  <category>
+    <pattern>*</pattern>
+    <template>I'm sorry, I didn't understand that. Could you please rephrase?</template>
+  </category>
+</aiml>

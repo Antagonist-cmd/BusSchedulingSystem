@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import sessionmaker
+from flask import request, jsonify
 
 # ✅ Initialize Flask
 app = Flask(__name__)
@@ -84,6 +85,7 @@ def load_user(user_id):
 @app.route("/")
 def home():
     return render_template("home.html")
+
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -373,12 +375,12 @@ def user_dashboard():
         Schedule.arrival_time,
         Route.source.label("start_location"),
         Route.destination.label("end_location"),
-        Schedule.total_seats,
+        Bus.capacity.label("total_seats"),  # ✅ Fetch capacity from Bus table instead
         db.func.count(Ticket.id).label("booked_seats")
     ).join(Bus, Schedule.bus_id == Bus.id  # ✅ Ensure proper join
     ).join(Route, Schedule.route_id == Route.id
     ).outerjoin(Ticket, Schedule.id == Ticket.schedule_id
-    ).group_by(Schedule.id, Bus.name, Bus.bus_number, Route.source, Route.destination, Schedule.total_seats
+    ).group_by(Schedule.id, Bus.name, Bus.bus_number, Route.source, Route.destination, Bus.capacity
     ).all()
 
     # ✅ Convert tuples to dictionaries (Flask cannot directly access tuple fields)
@@ -391,13 +393,15 @@ def user_dashboard():
             "arrival_time": row[4],
             "start_location": row[5],
             "end_location": row[6],
-            "total_seats": row[7],
-            "booked_seats": row[8]
+            "total_seats": row[7],  # ✅ Now correctly fetching from Bus table
+            "booked_seats": row[8],
+            "available_seats": row[7] - row[8]  # ✅ Correct calculation
         }
         for row in schedules
     ]
 
     return render_template('user_dashboard.html', schedules=schedules)
+
 
 
 
@@ -496,20 +500,38 @@ def book_ticket():
         schedule_id = int(request.form.get('schedule_id'))
         print(f"Received schedule_id: {schedule_id}")
 
-        seat_number = generate_seat_number()
-        print(f"Generated seat_number: {seat_number}")
-
         if not schedule_id:
             flash("Invalid schedule selected!", "danger")
             return redirect(url_for('view_schedules'))
 
+        # Fetch the schedule and bus details
         schedule = Schedule.query.get(schedule_id)
-        print(f"Schedule object: {schedule}")
-
         if not schedule:
             flash("Schedule not found!", "danger")
             return redirect(url_for('view_schedules'))
 
+        bus = Bus.query.get(schedule.bus_id)
+        if not bus:
+            flash("Bus information not found!", "danger")
+            return redirect(url_for('view_schedules'))
+
+        # Get all booked seats for this schedule
+        booked_seats = db.session.query(Ticket.seat_number).filter(Ticket.schedule_id == schedule_id).all()
+        booked_seats = {seat[0] for seat in booked_seats}
+
+        # Check if the bus is full
+        if len(booked_seats) >= bus.capacity:
+            flash("No available seats left!", "danger")
+            return redirect(url_for('view_schedules'))
+
+        # Find the first available seat
+        for seat_number in range(1, bus.capacity + 1):
+            if seat_number not in booked_seats:
+                break
+
+        print(f"Generated seat_number: {seat_number}")
+
+        # Create and commit the ticket
         new_ticket = Ticket(
             user_id=current_user.id,
             schedule_id=schedule_id,
@@ -517,19 +539,21 @@ def book_ticket():
             status='confirmed'
         )
 
-        print(f"New ticket: {new_ticket}")
         db.session.add(new_ticket)
         db.session.commit()
         print("Ticket committed to database!")
 
         flash("Ticket booked successfully!", "success")
-        return redirect(url_for('my_tickets'))
+
+        # ✅ Redirect to seat status page for real-time update
+        return redirect(url_for('seat_status', schedule_id=schedule_id))
 
     except Exception as e:
         print(f"Error: {e}")  # Print error in terminal
         flash(f"An error occurred: {e}", "danger")
         db.session.rollback()  # Rollback to avoid partial commit
         return redirect(url_for('view_schedules'))
+
 
 
 
@@ -588,15 +612,54 @@ def generate_seats(schedule_id, bus_id):
 
     db.session.commit()
 
+from decimal import Decimal  # ✅ Import Decimal for proper conversion
+
 @app.route('/seat_status/<int:schedule_id>')
 @login_required
 def seat_status(schedule_id):
-    seats = db.session.query(
-        Ticket.seat_number,
-        Ticket.status
-    ).filter(Ticket.schedule_id == schedule_id).all()
+    mode = request.args.get('mode', 'view')  # Get mode (default: view)
 
-    return render_template('seat_status.html', seats=seats, schedule_id=schedule_id)
+    # Fetch schedule details
+    schedule = Schedule.query.filter_by(id=schedule_id).first()
+    if not schedule:
+        flash("Schedule not found!", "danger")
+        return redirect(url_for('view_schedules'))
+
+    # ✅ Fetch correct bus details (fixing total_seats issue)
+    bus = Bus.query.filter_by(id=schedule.bus_id).first()
+    if not bus:
+        flash("Bus not found!", "danger")
+        return redirect(url_for('view_schedules'))
+
+    total_seats = bus.capacity  # ✅ Fetch from 'buses' table
+    price_per_seat = float(schedule.price)  # ✅ Convert Decimal to float
+
+    # Fetch booked seats
+    booked_seats = [ticket.seat_number for ticket in Ticket.query.filter_by(schedule_id=schedule_id).all()]
+    booked_count = len(booked_seats)
+
+    # ✅ Generate correct seat layout
+    seats = [
+        {"seat_number": i + 1, "status": "booked" if (i + 1) in booked_seats else "available"}
+        for i in range(total_seats)
+    ]
+
+    return render_template(
+        'seat_status.html',
+        seats=seats,
+        schedule_id=schedule_id,
+        total_seats=total_seats,
+        booked_count=booked_count,
+        booked_seats=booked_seats,
+        price_per_seat=price_per_seat,
+        mode=mode
+    )
+
+
+
+
+
+
 
 
 

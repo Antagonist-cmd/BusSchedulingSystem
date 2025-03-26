@@ -1,20 +1,701 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Seat Status for Schedule ID: {{ schedule_id }}</h2>
 
-<table border="1">
-    <tr>
-        <th>Seat Number</th>
-        <th>Status</th>
-    </tr>
+<h2 class="text-center">Seat Status for Schedule ID: {{ schedule_id }}</h2>
+
+{% if request.args.get('mode') == 'book' %}
+    <h3 class="text-center text-primary">Please select the seats you want to book</h3>
+    <p class="text-center">Price per seat: ₹{{ price_per_seat }}</p>
     {% for seat in seats %}
-    <tr>
-        <td>{{ seat.seat_number }}</td>
-        <td>{{ seat.status }}</td>
-    </tr>
-    {% endfor %}
-</table>
+    <div class="seat {{ 'booked' if seat.status == 'booked' else 'available' }}"
+         {% if seat.status == 'available' and mode == 'book' %}
+         onclick="selectSeat(this)"
+         {% endif %}>
+        {{ seat.seat_number }}
+    </div>
+{% endfor %}
 
-<a href="{{ url_for('view_schedules') }}">Back to Schedules</a>
+{% endif %}
+
+<!-- Seat Summary Table -->
+<div class="seat-summary-container">
+    <table class="seat-summary">
+        <thead>
+            <tr>
+                <th>Total Seats</th>
+                <th>Available Seats</th>
+                <th>Booked Seats</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ total_seats }}</td>
+                <td>{{ total_seats - booked_count }}</td>
+                <td>{{ booked_count }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h3 class="text-center mt-5 mb-4">Vertical View</h3>
+
+<!-- Vertical Bus Structure -->
+<div class="bus-container-wrapper">
+    <div class="bus-container vertical">
+        <!-- Bonnet and windshield -->
+        <div class="bonnet">
+            <div class="windshield"></div>
+            <div class="headlight headlight-left"></div>
+            <div class="headlight headlight-right"></div>
+        </div>
+
+        <div class="driver-area">
+            <div class="steering-wheel"></div>
+        </div>
+
+        <!-- Bus body with seats -->
+        <div class="bus-body" 
+            id="bus-seats-vertical"
+            data-total-seats="{{ total_seats }}"
+            data-booked-seats="{{ booked_seats|join(',') }}">
+        </div>
+
+        <!-- Stop sign -->
+        <div class="stop-sign">STOP</div>
+
+        <!-- Doors -->
+        <div class="front-door"></div>
+
+        <!-- Wheels -->
+        <div class="bus-wheels wheel-front-left"></div>
+        <div class="bus-wheels wheel-front-right"></div>
+        <div class="bus-wheels wheel-back-left"></div>
+        <div class="bus-wheels wheel-back-right"></div>
+
+        <!-- Seat Legend -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color available"></div>
+                <span>Available</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color booked"></div>
+                <span>Booked</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h3 class="text-center mt-5 mb-4">Horizontal View</h3>
+
+<!-- Horizontal Bus Structure -->
+<div class="bus-container-wrapper">
+    <div class="bus-container horizontal">
+        <!-- Front of horizontal bus -->
+        <div class="h-bonnet">
+            <div class="h-windshield"></div>
+            <div class="h-headlight h-headlight-top"></div>
+            <div class="h-headlight h-headlight-bottom"></div>
+        </div>
+
+        <div class="h-driver-area">
+            <div class="h-steering-wheel"></div>
+        </div>
+
+        <!-- Bus body with seats -->
+        <div class="h-bus-body" 
+            id="bus-seats-horizontal"
+            data-total-seats="{{ total_seats }}"
+            data-booked-seats="{{ booked_seats|join(',') }}">
+        </div>
+
+        <!-- Stop sign -->
+        <div class="h-stop-sign">STOP</div>
+
+        <!-- Doors -->
+        <div class="h-front-door"></div>
+
+        <!-- Wheels -->
+        <div class="h-bus-wheels h-wheel-front-top"></div>
+        <div class="h-bus-wheels h-wheel-front-bottom"></div>
+        <div class="h-bus-wheels h-wheel-back-top"></div>
+        <div class="h-bus-wheels h-wheel-back-bottom"></div>
+
+        <!-- Seat Legend -->
+        <div class="h-legend">
+            <div class="h-legend-item">
+                <div class="h-legend-color available"></div>
+                <span>Available</span>
+            </div>
+            <div class="h-legend-item">
+                <div class="h-legend-color booked"></div>
+                <span>Booked</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="text-center my-4">
+    <a href="{{ url_for('view_schedules') }}" class="btn btn-secondary">Back to Schedules</a>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const totalSeats = parseInt("{{ total_seats }}") || 0;
+        const bookedSeats = "{{ booked_seats|join(',') }}".split(',').map(Number);
+        const bookedSeatsSet = new Set(bookedSeats);
+
+        // Determine number of rows dynamically (2, 4, or 6)
+        let columns = totalSeats <= 20 ? 2 : totalSeats <= 40 ? 4 : 6;
+        let rows = Math.ceil(totalSeats / columns);
+
+        /*** VERTICAL BUS VIEW ***/
+        const busBodyVertical = document.getElementById('bus-seats-vertical');
+        busBodyVertical.innerHTML = '';
+        let seatNumber = 1;
+
+        for (let i = 0; i < rows; i++) {
+            const row = document.createElement('div');
+            row.className = 'seat-row';
+
+            // Left Side Seats
+            const leftPair = document.createElement('div');
+            leftPair.className = 'seat-pair';
+            for (let j = 0; j < columns / 2; j++) { // Adjust based on column count
+                if (seatNumber <= totalSeats) {
+                    const seat = document.createElement('div');
+                    seat.className = 'seat ' + (bookedSeatsSet.has(seatNumber) ? 'booked' : 'available');
+                    seat.textContent = seatNumber++;
+                    leftPair.appendChild(seat);
+                }
+            }
+            row.appendChild(leftPair);
+
+            // Aisle
+            const aisle = document.createElement('div');
+            aisle.className = 'aisle';
+            row.appendChild(aisle);
+
+            // Right Side Seats
+            const rightPair = document.createElement('div');
+            rightPair.className = 'seat-pair';
+            for (let j = 0; j < columns / 2; j++) { // Adjust based on column count
+                if (seatNumber <= totalSeats) {
+                    const seat = document.createElement('div');
+                    seat.className = 'seat ' + (bookedSeatsSet.has(seatNumber) ? 'booked' : 'available');
+                    seat.textContent = seatNumber++;
+                    rightPair.appendChild(seat);
+                }
+            }
+            row.appendChild(rightPair);
+
+            busBodyVertical.appendChild(row);
+        }
+
+        /*** HORIZONTAL BUS VIEW ***/
+        const busBodyHorizontal = document.getElementById('bus-seats-horizontal');
+        busBodyHorizontal.innerHTML = '';
+
+        seatNumber = 1; // Reset seat numbering for horizontal layout
+
+        for (let i = 0; i < rows; i++) {
+            const row = document.createElement('div');
+            row.className = 'h-seat-row';
+
+            // Top Side Seats
+            const topPair = document.createElement('div');
+            topPair.className = 'h-seat-pair';
+            for (let j = 0; j < columns / 2; j++) {
+                if (seatNumber <= totalSeats) {
+                    const seat = document.createElement('div');
+                    seat.className = 'h-seat ' + (bookedSeatsSet.has(seatNumber) ? 'booked' : 'available');
+                    seat.textContent = seatNumber++;
+                    topPair.appendChild(seat);
+                }
+            }
+            row.appendChild(topPair);
+
+            // Aisle
+            const aisle = document.createElement('div');
+            aisle.className = 'h-aisle';
+            row.appendChild(aisle);
+
+            // Bottom Side Seats
+            const bottomPair = document.createElement('div');
+            bottomPair.className = 'h-seat-pair';
+            for (let j = 0; j < columns / 2; j++) {
+                if (seatNumber <= totalSeats) {
+                    const seat = document.createElement('div');
+                    seat.className = 'h-seat ' + (bookedSeatsSet.has(seatNumber) ? 'booked' : 'available');
+                    seat.textContent = seatNumber++;
+                    bottomPair.appendChild(seat);
+                }
+            }
+            row.appendChild(bottomPair);
+
+            busBodyHorizontal.appendChild(row);
+        }
+    });
+    function selectSeat(seatElement) {
+        if (!seatElement.classList.contains('booked')) {
+            seatElement.classList.toggle('selected');
+        }
+    }
+</script>
+
+<style>
+    body {
+        background-color: #f4f4f4;
+        font-family: Arial, sans-serif;
+    }
+
+    .seat-summary-container {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 40px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .seat-summary {
+        width: 60%;
+        border-collapse: collapse;
+        text-align: center;
+        background-color: white;
+        border: 1px solid #ccc;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .seat-summary th, .seat-summary td {
+        padding: 10px;
+        border: 1px solid #ccc;
+    }
+
+    .seat-summary th {
+        background-color: #ffcf00;
+    }
+
+    .bus-container-wrapper {
+        display: flex;
+        justify-content: center;
+        margin: 30px 0 60px 0;
+    }
+
+    /* Vertical Bus Styles */
+    .bus-container.vertical {
+        width: 220px;
+        height: 600px;
+        background-color: #ffcf00;
+        border-radius: 15px;
+        position: relative;
+        overflow: visible;
+        border: 4px solid #333;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    .bonnet {
+        width: 160px;
+        height: 70px;
+        background-color: #ffcf00;
+        position: absolute;
+        top: -70px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 15px 15px 0 0;
+        border: 4px solid #333;
+        border-bottom: none;
+        z-index: -1;
+    }
+
+    .windshield {
+        width: 140px;
+        height: 30px;
+        background-color: #a8d5f7;
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 10px;
+        border: 3px solid #555;
+    }
+
+    .headlight {
+        width: 15px;
+        height: 15px;
+        background-color: #ffffff;
+        border-radius: 50%;
+        position: absolute;
+        bottom: 10px;
+        border: 2px solid #555;
+    }
+
+    .headlight-left {
+        left: 15px;
+    }
+
+    .headlight-right {
+        right: 15px;
+    }
+
+    .driver-area {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        width: 40px;
+        height: 40px;
+        background-color: #ddd;
+        border-radius: 8px;
+        border: 2px solid #333;
+    }
+
+    .steering-wheel {
+        width: 20px;
+        height: 20px;
+        background-color: #333;
+        border-radius: 50%;
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        border: 2px solid #555;
+    }
+
+    .bus-body {
+        margin-top: 90px;
+        display: flex;
+        flex-direction: column;
+        gap: 25px;
+        padding: 0 15px;
+    }
+
+    .seat-row {
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .seat-pair {
+        display: flex;
+        gap: 5px;
+    }
+
+    .seat {
+        width: 25px;
+        height: 25px;
+        background-color: #808080;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: bold;
+        color: white;
+        box-shadow: 0 2px 3px rgba(0,0,0,0.2);
+    }
+
+    .seat.available, .h-seat.available {
+        background-color: #2ecc71;
+    }
+
+    .seat.booked, .h-seat.booked {
+        background-color: #c0392b;
+    }
+
+    .aisle {
+        width: 40px;
+    }
+
+    .front-door {
+        position: absolute;
+        width: 10px;
+        height: 60px;
+        background-color: #a8d5f7;
+        right: -10px;
+        top: 100px;
+        border: 2px solid #555;
+    }
+
+    .bus-wheels {
+        width: 25px;
+        height: 25px;
+        background-color: #333;
+        border-radius: 50%;
+        position: absolute;
+        border: 3px solid #555;
+    }
+
+    .wheel-front-left {
+        left: -10px;
+        top: 100px;
+    }
+
+    .wheel-front-right {
+        right: -10px;
+        top: 100px;
+    }
+
+    .wheel-back-left {
+        left: -10px;
+        bottom: 100px;
+    }
+
+    .wheel-back-right {
+        right: -10px;
+        bottom: 100px;
+    }
+
+    .stop-sign {
+        position: absolute;
+        width: 30px;
+        height: 30px;
+        background-color: #ff0000;
+        border-radius: 50%;
+        left: -35px;
+        top: 150px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-weight: bold;
+        font-size: 8px;
+        border: 2px solid white;
+    }
+
+    .legend {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        position: absolute;
+        bottom: -40px;
+        left: 0;
+        right: 0;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+    }
+
+    .legend-color {
+        width: 15px;
+        height: 15px;
+        border-radius: 3px;
+    }
+
+    .legend-color.available {
+        background-color: #2ecc71;
+    }
+
+    .legend-color.booked {
+        background-color: #c0392b;
+    }
+
+    /* Horizontal Bus Styles */
+    .bus-container.horizontal {
+        width: 600px;
+        height: 220px;
+        background-color: #ffcf00;
+        border-radius: 15px;
+        position: relative;
+        overflow: visible;
+        border: 4px solid #333;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        margin-bottom: 50px;
+    }
+
+    .h-bonnet {
+        width: 70px;
+        height: 160px;
+        background-color: #ffcf00;
+        position: absolute;
+        left: -70px;
+        top: 50%;
+        transform: translateY(-50%);
+        border-radius: 15px 0 0 15px;
+        border: 4px solid #333;
+        border-right: none;
+        z-index: -1;
+    }
+
+    .h-windshield {
+        width: 30px;
+        height: 140px;
+        background-color: #a8d5f7;
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        border-radius: 10px;
+        border: 3px solid #555;
+    }
+
+    .h-headlight {
+        width: 15px;
+        height: 15px;
+        background-color: #ffffff;
+        border-radius: 50%;
+        position: absolute;
+        right: 10px;
+        border: 2px solid #555;
+    }
+
+    .h-headlight-top {
+        top: 30px;
+    }
+
+    .h-headlight-bottom {
+        bottom: 30px;
+    }
+
+    .h-driver-area {
+        position: absolute;
+        left: 20px;
+        top: 20px;
+        width: 40px;
+        height: 40px;
+        background-color: #ddd;
+        border-radius: 8px;
+        border: 2px solid #333;
+    }
+
+    .h-steering-wheel {
+        width: 20px;
+        height: 20px;
+        background-color: #333;
+        border-radius: 50%;
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        border: 2px solid #555;
+    }
+
+    .h-bus-body {
+        display: flex;
+        padding: 15px;
+        height: 100%;
+        align-items: center;
+        margin-left: 70px;
+        gap: 25px;
+    }
+
+    .h-seat-row {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 100%;
+    }
+
+    .h-seat-pair {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .h-seat {
+        width: 25px;
+        height: 25px;
+        background-color: #808080;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: bold;
+        color: white;
+        box-shadow: 0 2px 3px rgba(0,0,0,0.2);
+    }
+
+    .h-aisle {
+        height: 40px;
+    }
+
+    .h-front-door {
+        position: absolute;
+        height: 10px;
+        width: 60px;
+        background-color: #a8d5f7;
+        top: -10px;
+        left: 100px;
+        border: 2px solid #555;
+    }
+
+    .h-bus-wheels {
+        width: 25px;
+        height: 25px;
+        background-color: #333;
+        border-radius: 50%;
+        position: absolute;
+        border: 3px solid #555;
+    }
+
+    .h-wheel-front-top {
+        top: -10px;
+        left: 100px;
+    }
+
+    .h-wheel-front-bottom {
+        bottom: -10px;
+        left: 100px;
+    }
+
+    .h-wheel-back-top {
+        top: -10px;
+        right: 100px;
+    }
+
+    .h-wheel-back-bottom {
+        bottom: -10px;
+        right: 100px;
+    }
+
+    .h-stop-sign {
+        position: absolute;
+        width: 30px;
+        height: 30px;
+        background-color: #ff0000;
+        border-radius: 50%;
+        top: -35px;
+        left: 150px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-weight: bold;
+        font-size: 8px;
+        border: 2px solid white;
+    }
+
+    .h-legend {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        position: absolute;
+        bottom: -40px;
+        left: 0;
+        right: 0;
+    }
+
+    .h-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+    }
+
+    .h-legend-color {
+        width: 15px;
+        height: 15px;
+        border-radius: 3px;
+    }
+
+    .h-legend-color.available {
+        background-color: #2ecc71;
+    }
+
+    .h-legend-color.booked {
+        background-color: #c0392b;
+    }
+</style>
+    
 {% endblock %}
