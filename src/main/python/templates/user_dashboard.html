@@ -3,94 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Dashboard</title>
+    <title>Bus Booking Dashboard</title>
+    
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    
     <style>
         body {
-            background: #f4f4f4;
+            background-color: #f4f4f4;
         }
         .container {
-            margin-top: 30px;
+            max-width: 1200px;
+            margin: 30px auto;
         }
         .card {
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
+        #map { 
+            height: 400px; 
+            width: 100%; 
+            border: 2px solid #ccc;
+        }
     </style>
 </head>
 <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Bus Booking System</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('view_schedules') }}">View Schedules</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('my_tickets') }}">My Tickets</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-danger text-white" href="{{ url_for('logout') }}">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
 
-<!-- ✅ Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="#">Bus Booking System</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('view_schedules') }}">View Schedules</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('my_tickets') }}">My Tickets</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link btn btn-danger text-white" href="{{ url_for('logout') }}">Logout</a>
-                </li>
-            </ul>
+    <!-- Dashboard Content -->
+    <div class="container">
+        <h2 class="text-center my-4">Welcome, {{ current_user.username }}</h2>
+        
+        <!-- Journey Planner -->
+        <div class="card mb-4 p-3">
+            <h3 class="text-center mb-3">Plan Your Journey</h3>
+            <form action="{{ url_for('plan_journey') }}" method="GET">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="current_station" class="form-label">Current Station:</label>
+                        <input type="text" name="current_station" id="current_station" class="form-control" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="destination" class="form-label">Destination:</label>
+                        <input type="text" name="destination" id="plan_destination" class="form-control" required>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary">Plan Journey</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Route Planner with Map -->
+        <div class="card mb-4 p-3">
+            <h3 class="text-center mb-3">Route Planner</h3>
+            <form id="route-form" class="mb-3">
+                <div class="row">
+                    <div class="col-md-5 mb-3">
+                        <input type="text" id="source" class="form-control" placeholder="Enter Source" required>
+                    </div>
+                    <div class="col-md-5 mb-3">
+                        <input type="text" id="destination" class="form-control" placeholder="Enter Destination" required>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <button type="submit" class="btn btn-primary w-100">Show Route</button>
+                    </div>
+                </div>
+            </form>
+            <div id="map" class="mb-3"></div>
+            <div>
+                <h4>Available Buses</h4>
+                <ul id="bus-list" class="list-group"></ul>
+            </div>
+        </div>
+
+        <!-- Bus Schedules -->
+        <div class="card p-3">
+            <h4 class="text-center mb-3">Available Bus Schedules</h4>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Bus Name</th>
+                            <th>Bus Number</th>
+                            <th>Departure</th>
+                            <th>Arrival</th>
+                            <th>Route</th>
+                            <th>Seats Available</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for schedule in schedules %}
+                        <tr>
+                            <td>{{ schedule.name }}</td>
+                            <td>{{ schedule.bus_number }}</td>
+                            <td>{{ schedule.departure_time }}</td>
+                            <td>{{ schedule.arrival_time }}</td>
+                            <td>{{ schedule.start_location }} → {{ schedule.end_location }}</td>
+                            <td>
+                                {% if schedule.total_seats is not none and schedule.booked_seats is not none %}
+                                    {{ schedule.total_seats - schedule.booked_seats }}
+                                {% else %}
+                                    <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ url_for('seat_status', schedule_id=schedule.id, mode='view') }}" class="btn btn-info btn-sm">
+                                        Check Seats
+                                    </a>
+                                    <a href="{{ url_for('seat_status', schedule_id=schedule.id, mode='book') }}" class="btn btn-primary btn-sm">
+                                        Book Now
+                                    </a>
+                                </div>
+                            </td>                    
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</nav>
 
-
-<!-- ✅ Dashboard Content -->
-<div class="container">
-    <h2 class="text-center my-4">Welcome, {{ current_user.username }}</h2>
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <div class="card p-3 mb-4">
-        <h4 class="text-center">Available Bus Schedules</h4>
-        <table class="table table-striped table-bordered mt-3">
-            <thead class="table-dark">
-                <tr>
-                    <th>Bus Name</th>
-                    <th>Bus Number</th>
-                    <th>Departure</th>
-                    <th>Arrival</th>
-                    <th>Route</th>
-                    <th>Seats Available</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for schedule in schedules %}
-                <tr>
-                    <td>{{ schedule.name }}</td>
-                    <td>{{ schedule.bus_number }}</td>
-                    <td>{{ schedule.departure_time }}</td>
-                    <td>{{ schedule.arrival_time }}</td>
-                    <td>{{ schedule.start_location }} → {{ schedule.end_location }}</td>
-                    <td>
-                        {% if schedule.total_seats is not none and schedule.booked_seats is not none %}
-                            {{ schedule.total_seats - schedule.booked_seats }}
-                        {% else %}
-                            <span class="text-muted">0</span>
-                        {% endif %}
-                    </td>
-                    <td class="d-flex gap-2">
-                        <a href="{{ url_for('seat_status', schedule_id=schedule.id) }}" class="btn btn-info btn-sm">Check Seats</a>
-                        <form action="{{ url_for('book_ticket') }}" method="POST" class="d-inline">
-                            <input type="hidden" name="schedule_id" value="{{ schedule.id }}">
-                            <button type="submit" class="btn btn-primary btn-sm">Book Now</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-<!-- ✅ Bootstrap Scripts -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
+    <script>
+        // Define bounds to restrict the map to Delhi
+        var delhiBounds = [
+            [28.40, 76.80], // Southwest corner
+            [28.90, 77.40]  // Northeast corner
+        ];
+    
+        // Map Initialization with restricted zoom and bounds
+        var map = L.map('map', {
+            center: [28.6139, 77.2090], // Centered at Delhi
+            zoom: 12,
+            minZoom: 10,  // Prevent zooming out too much
+            maxZoom: 18,  // Allow zooming in for details
+            maxBounds: delhiBounds, // Restrict panning outside Delhi
+            maxBoundsViscosity: 1.0 // Enforce bounds strictly
+        });
+    
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+    
+        // Route Form Submission Handler
+        document.getElementById("route-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+            
+            let source = document.getElementById("source").value.trim();
+            let destination = document.getElementById("destination").value.trim();
+            
+            if (!source || !destination) {
+                alert("Please enter both source and destination!");
+                return;
+            }
+    
+            fetch("/get_buses", {
+                method: "POST",
+                body: new URLSearchParams({source, destination}),
+                headers: {"Content-Type": "application/x-www-form-urlencoded"}
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+    
+                // Clear previous route layer
+                if (!window.routeLayer) {
+                    window.routeLayer = L.layerGroup().addTo(map);
+                } else {
+                    window.routeLayer.clearLayers();
+                }
+    
+                // Validate route data
+                if (!Array.isArray(data.route) || data.route.length === 0) {
+                    alert("No route data available!");
+                    return;
+                }
+    
+                // Draw route on map
+                let routeCoords = data.route.map(coord => [coord.lat, coord.lng]);
+                L.polyline(routeCoords, { color: 'blue', weight: 5 }).addTo(window.routeLayer);
+                map.fitBounds(routeCoords);
+    
+                // Populate bus list
+                let busList = document.getElementById("bus-list");
+                busList.innerHTML = "";
+                data.buses.forEach(bus => {
+                    let item = document.createElement("li");
+                    item.className = "list-group-item";
+                    item.innerHTML = `
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="my-0">${bus.bus_name}</h6>
+                                <small class="text-muted">
+                                    🕒 ${bus.departure} → ${bus.arrival}
+                                </small>
+                            </div>
+                            <span class="text-muted">₹${bus.price}</span>
+                        </div>
+                    `;
+                    busList.appendChild(item);
+                });
+            })
+            .catch(error => {
+                console.error("Error fetching buses:", error);
+                alert("Something went wrong! Please try again.");
+            });
+        });
+    </script>    
 </body>
 </html>
