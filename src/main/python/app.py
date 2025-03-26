@@ -4,6 +4,10 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import sessionmaker
+from flask import jsonify
+from sqlalchemy import func
+import json
+
 
 # ✅ Initialize Flask
 app = Flask(__name__)
@@ -44,6 +48,7 @@ class Route(db.Model):
     source = db.Column(db.String(100), nullable=False)
     destination = db.Column(db.String(100), nullable=False)
     distance_km = db.Column(db.Integer, nullable=False)
+    coordinates = db.Column(db.Text, nullable=True) 
 
 class Schedule(db.Model):
     __tablename__ = 'schedules'
@@ -373,12 +378,12 @@ def user_dashboard():
         Schedule.arrival_time,
         Route.source.label("start_location"),
         Route.destination.label("end_location"),
-        Schedule.total_seats,
+        Bus.capacity.label("total_seats"),  # ✅ Fetch capacity from Bus table instead
         db.func.count(Ticket.id).label("booked_seats")
     ).join(Bus, Schedule.bus_id == Bus.id  # ✅ Ensure proper join
     ).join(Route, Schedule.route_id == Route.id
     ).outerjoin(Ticket, Schedule.id == Ticket.schedule_id
-    ).group_by(Schedule.id, Bus.name, Bus.bus_number, Route.source, Route.destination, Schedule.total_seats
+    ).group_by(Schedule.id, Bus.name, Bus.bus_number, Route.source, Route.destination, Bus.capacity
     ).all()
 
     # ✅ Convert tuples to dictionaries (Flask cannot directly access tuple fields)
@@ -391,13 +396,15 @@ def user_dashboard():
             "arrival_time": row[4],
             "start_location": row[5],
             "end_location": row[6],
-            "total_seats": row[7],
-            "booked_seats": row[8]
+            "total_seats": row[7],  # ✅ Now correctly fetching from Bus table
+            "booked_seats": row[8],
+            "available_seats": row[7] - row[8]  # ✅ Correct calculation
         }
         for row in schedules
     ]
 
     return render_template('user_dashboard.html', schedules=schedules)
+
 
 
 
@@ -493,42 +500,69 @@ def delete_schedule(schedule_id):
 @login_required
 def book_ticket():
     try:
-        schedule_id = int(request.form.get('schedule_id'))
-        print(f"Received schedule_id: {schedule_id}")
-
-        seat_number = generate_seat_number()
-        print(f"Generated seat_number: {seat_number}")
+        schedule_id = request.form.get('schedule_id')
+        selected_seats = request.form.getlist('selected_seats')  # Fetch multiple selected seats
 
         if not schedule_id:
             flash("Invalid schedule selected!", "danger")
             return redirect(url_for('view_schedules'))
 
-        schedule = Schedule.query.get(schedule_id)
-        print(f"Schedule object: {schedule}")
-
+        schedule = Schedule.query.get(int(schedule_id))
         if not schedule:
             flash("Schedule not found!", "danger")
             return redirect(url_for('view_schedules'))
 
-        new_ticket = Ticket(
-            user_id=current_user.id,
-            schedule_id=schedule_id,
-            seat_number=seat_number,
-            status='confirmed'
-        )
+        bus = Bus.query.get(schedule.bus_id)
+        if not bus:
+            flash("Bus information not found!", "danger")
+            return redirect(url_for('view_schedules'))
 
-        print(f"New ticket: {new_ticket}")
-        db.session.add(new_ticket)
+        # Fetch already booked seats
+        booked_seats = {seat[0] for seat in db.session.query(Ticket.seat_number)
+                        .filter(Ticket.schedule_id == schedule_id).all()}
+
+        # Ensure seats are selected
+        if not selected_seats:
+            flash("No seats selected!", "danger")
+            return redirect(url_for('seat_status', schedule_id=schedule_id, mode='book'))
+
+        selected_seats = request.form.get('selected_seats')
+        if selected_seats:
+            selected_seats = list(map(int, selected_seats.split(',')))  # Convert comma-separated values to a list
+        else:
+            selected_seats = []  # Convert to integers
+
+        print(f"Selected Seats: {selected_seats}")    
+
+        # Validate seat selection
+        for seat_number in selected_seats:
+            if seat_number < 1 or seat_number > bus.capacity:
+                flash(f"Invalid seat selection: {seat_number}", "danger")
+                return redirect(url_for('seat_status', schedule_id=schedule_id, mode='book'))
+            if seat_number in booked_seats:
+                flash(f"Seat {seat_number} is already booked!", "danger")
+                return redirect(url_for('seat_status', schedule_id=schedule_id, mode='book'))
+
+        # Book each selected seat
+        for seat_number in selected_seats:
+            new_ticket = Ticket(
+                user_id=current_user.id,
+                schedule_id=schedule_id,
+                seat_number=seat_number,
+                status='confirmed'
+            )
+            db.session.add(new_ticket)
+
         db.session.commit()
-        print("Ticket committed to database!")
+        flash("Tickets booked successfully!", "success")
 
-        flash("Ticket booked successfully!", "success")
-        return redirect(url_for('my_tickets'))
+        # ✅ Redirect to seat status page to show updated seats
+        return redirect(url_for('seat_status', schedule_id=schedule_id))
 
     except Exception as e:
-        print(f"Error: {e}")  # Print error in terminal
+        db.session.rollback()  # Rollback to avoid partial commits
+        print(f"Error: {e}")  # Debugging
         flash(f"An error occurred: {e}", "danger")
-        db.session.rollback()  # Rollback to avoid partial commit
         return redirect(url_for('view_schedules'))
 
 
@@ -566,11 +600,15 @@ def cancel_ticket(ticket_id):
     if not ticket or ticket.user_id != current_user.id:
         flash("Invalid ticket!", "danger")
         return redirect(url_for('my_tickets'))
-    
+
     db.session.delete(ticket)
     db.session.commit()
+
     flash("Ticket cancelled successfully!", "success")
-    return redirect(url_for('my_tickets'))
+    
+    # ✅ Redirect to seat_status to refresh booked seats
+    return redirect(url_for('seat_status', schedule_id=ticket.schedule_id))
+
 
 def generate_seats(schedule_id, bus_id):
     """Generate seats for a schedule based on bus capacity."""
@@ -588,15 +626,137 @@ def generate_seats(schedule_id, bus_id):
 
     db.session.commit()
 
+from decimal import Decimal  # ✅ Import Decimal for proper conversion
+
 @app.route('/seat_status/<int:schedule_id>')
 @login_required
 def seat_status(schedule_id):
-    seats = db.session.query(
-        Ticket.seat_number,
-        Ticket.status
-    ).filter(Ticket.schedule_id == schedule_id).all()
+    mode = request.args.get('mode', 'view')  # Get mode (default: view)
 
-    return render_template('seat_status.html', seats=seats, schedule_id=schedule_id)
+    # Fetch schedule details
+    schedule = Schedule.query.filter_by(id=schedule_id).first()
+    if not schedule:
+        flash("Schedule not found!", "danger")
+        return redirect(url_for('view_schedules'))
+
+    # ✅ Fetch correct bus details (fixing total_seats issue)
+    bus = Bus.query.filter_by(id=schedule.bus_id).first()
+    if not bus:
+        flash("Bus not found!", "danger")
+        return redirect(url_for('view_schedules'))
+
+    total_seats = bus.capacity  # ✅ Fetch from 'buses' table
+    price_per_seat = float(schedule.price)  # ✅ Convert Decimal to float
+
+    # Fetch booked seats
+    booked_tickets = Ticket.query.filter_by(schedule_id=schedule_id).all()
+    booked_seats = [ticket.seat_number for ticket in booked_tickets]
+    booked_count = len(booked_seats)
+
+    # ✅ Generate correct seat layout
+    seats = [
+        {"seat_number": i + 1, "status": "booked" if (i + 1) in booked_seats else "available"}
+        for i in range(total_seats)
+    ]
+
+    return render_template(
+        'seat_status.html',
+        seats=seats,
+        schedule_id=schedule_id,
+        total_seats=total_seats,
+        booked_count=booked_count,
+        booked_seats=booked_seats,
+        price_per_seat=price_per_seat,
+        mode=mode
+    )
+
+
+@app.route('/plan_journey', methods=['GET'])
+@login_required
+def plan_journey():
+    current_station = request.args.get('current_station')
+    destination = request.args.get('destination')
+    
+    if not current_station or not destination:
+        flash("Please enter both your current station and destination.", "danger")
+        return redirect(url_for('user_dashboard'))
+    
+    # Query your routes table to find a matching route
+    route = Route.query.filter_by(source=current_station, destination=destination).first()
+    if not route:
+        flash("No direct route found. Please try different stations.", "warning")
+        return redirect(url_for('user_dashboard'))
+    
+    # Get schedules for the route
+    schedules = db.session.query(
+        Schedule.id,
+        Bus.name.label("bus_name"),
+        Bus.bus_number,
+        Schedule.departure_time,
+        Schedule.arrival_time,
+        Schedule.price,
+        Bus.capacity
+    ).join(Bus, Schedule.bus_id == Bus.id
+    ).filter(Schedule.route_id == route.id).all()
+    
+    # Convert schedules to dictionaries for the template
+    schedules = [
+        {
+            "id": row[0],
+            "bus_name": row[1],
+            "bus_number": row[2],
+            "departure_time": row[3],
+            "arrival_time": row[4],
+            "price": row[5],
+            "capacity": row[6]
+        }
+        for row in schedules
+    ]
+    
+    return render_template('plan_journey.html',
+                           current_station=current_station,
+                           destination=destination,
+                           schedules=schedules)
+
+@app.route('/get_buses', methods=['POST'])
+def get_buses():
+    source = (request.form.get('source') or "").strip()
+    destination = (request.form.get('destination') or "").strip()
+
+    # Query database for matching routes (case-insensitive)
+    routes = Route.query.filter(
+        func.lower(Route.source) == source.lower(),
+        func.lower(Route.destination) == destination.lower()
+    ).all()
+
+    if not routes:
+        return jsonify({"error": "No routes found"}), 404
+
+    buses = []
+    route_coordinates = []
+
+    for route in routes:
+        schedules = Schedule.query.filter_by(route_id=route.id).all()
+        
+        for schedule in schedules:
+            bus = Bus.query.get(schedule.bus_id)
+            if bus:
+                buses.append({
+                    "bus_name": bus.name,
+                    "departure": schedule.departure_time.strftime("%H:%M"),
+                    "arrival": schedule.arrival_time.strftime("%H:%M"),
+                    "price": float(schedule.price)
+                })
+
+        # Fetch route coordinates
+        try:
+            if route.coordinates:
+                coords = json.loads(route.coordinates) if isinstance(route.coordinates, str) else route.coordinates
+                route_coordinates.extend(coords)  # Append instead of overwriting
+        except json.JSONDecodeError:
+            pass  # Ignore decoding errors
+
+    return jsonify({"buses": buses, "route": route_coordinates})
 
 
 
